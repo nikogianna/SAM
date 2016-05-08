@@ -9,10 +9,10 @@ module SAM (str, mode, clk, reset, msg, frame);
 	
 	reg [3:0] shifter;
 	
-	reg waszero;
+	reg waszero, msg, rdy;
 	reg [5:0] ones_count, zeros_count;
 	reg [9:0] il;
-	reg [7:0] mesg;
+	reg [7:0] mesg, msgcd, sndmsg;
 	
  	always @(posedge clk or negedge reset)
 	   if (!reset)
@@ -27,7 +27,8 @@ module SAM (str, mode, clk, reset, msg, frame);
             waszero     <= 1'b0;	
             ones_count  <= 6'h00;
 		    zeros_count <= 6'h00;	
-            il          <= 10'h001;			
+            il          <= 10'h001;	
+            rdy         <= 1'b0;			
           end
        else if (mode)
           begin
@@ -73,11 +74,13 @@ module SAM (str, mode, clk, reset, msg, frame);
 				  if ((ones_count >= zeros_count) && (ones_count > 0) && (zeros_count > 0))
                      begin 
 					   mesg[il - 1] <= 1'b1;
+					   msgcd[il - 1]  <= (1'b1 ^ di[il -1]) | capsNi[il -1]; 
                        il           <= il - 1;
     				 end
                   else if ((ones_count < zeros_count) && (ones_count >0) && (zeros_count > 0))
                      begin
  					   mesg[il - 1] <= 1'b0;
+					   msgcd[il - 1]   <= (1'b0 ^ di[il -1]) | capsNi[il -1]; 
  					   il           <= il - 1;
 					 end			  
 				
@@ -94,6 +97,15 @@ module SAM (str, mode, clk, reset, msg, frame);
 				  waszero <= 1'b1;
 				  zeros_count <= zeros_count + 1;
 				end
-            end   
- 		 end		
+            end 
+       else if (!il)	
+         begin 
+            rdy         <= 1'b1;
+			sndmsg      <= msgcd;
+			il          <= 10'h008;
+         end			
+ 		 end	
+
+    //always @(posedge clk or negedge reset)
+      // if(!reset)	
 endmodule
