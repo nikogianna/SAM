@@ -10,7 +10,7 @@ reg [9:0] d_count, capsN_count;
 	
 reg [3:0] shifter;
 	
-//reg /*waszero, msg, rdy, */frame;
+reg waszero;
 reg [5:0] ones_count, zeros_count;
 reg [9:0] il;//, ils;
 reg [7:0] mesg, msgcd, sndmsg;
@@ -30,7 +30,6 @@ reg conf_over;
 	  case (current_state)
 	    start : next_state = (mode) ? confg : start;
 		confg : next_state = ((!mode) && (!conf_over)) ? start : ((conf_over) && (!mode)) ? norm : confg;
-        //config_over : next_state = (!mode) ? norm : config_over;
         norm : next_state = (mode) ? start : norm; 		
 	    default next_state = start;
 	  endcase
@@ -61,7 +60,7 @@ reg conf_over;
 				  begin
 				   d_count <= d_count << shifter;
 				   capsN_count <= capsN_count << shifter;
-				   //il          <= il << shifter;
+				   il          <= il << shifter;
 				  end
 				shifter <= shifter >> 1;
                 n_count <= n_count - 1;
@@ -78,5 +77,58 @@ reg conf_over;
 				 capsN_count <= capsN_count - 1;
 			   end
 			//else conf_over <= 1'b1;
-		  end			
+		  end
+
+
+    always @(negedge clk or negedge reset)
+	  if (!reset)
+	    begin
+		  il          <= 10'h001; 
+          ones_count  <= 6'h00;
+		  zeros_count <= 6'h00;
+          waszero     <= 1'b0;		  
+		end
+	  else if (current_state == norm)
+        begin
+		   if (il)
+		     begin
+              if ((waszero == 1'b1) && (str == 1'b1))
+			    begin
+				  waszero     <= 1'b0;
+				  
+				  if (((ones_count + zeros_count) < 10) || ((ones_count + zeros_count) > 60))
+				     begin
+					    ones_count  <= 6'h00;
+						zeros_count <= 6'h00;
+					 end
+                  
+				  if ((ones_count >= zeros_count) && (ones_count > 0) && (zeros_count > 0))
+                     begin 
+					   mesg[il - 1] <= 1'b1;
+					   //msgcd[il - 1]  <= (1'b1 ^ di[il -1]) | capsNi[il -1]; 
+                       il           <= il - 1;
+    				 end
+                  else if ((ones_count < zeros_count) && (ones_count >0) && (zeros_count > 0))
+                     begin
+ 					   mesg[il - 1] <= 1'b0;
+					   //msgcd[il - 1]   <= (1'b0 ^ di[il -1]) | capsNi[il -1]; 
+ 					   il           <= il - 1;
+					 end			  
+				
+				ones_count  <= 6'h01;
+				zeros_count <= 6'h00;
+				end
+             				
+			  else if (str == 1'b1)
+				begin
+				  ones_count <= ones_count + 1;
+                end
+			  else if (str == 1'b0)
+				begin
+				  waszero <= 1'b1;
+				  zeros_count <= zeros_count + 1;
+				end
+            end 	
+        end
+		
 endmodule
