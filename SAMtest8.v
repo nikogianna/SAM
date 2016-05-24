@@ -31,7 +31,8 @@ module SAMtest ();
                           // After the configuration is over, str should be driven to 0 before the message is sent.
                           // However, the last bit of the configuration may be 1, therefore you 've got to devise a
                           // mechanism to sent str to 0 at least for 1 clock cycle.
-  integer i;              // Holds number of generated bits
+  integer i;
+  integer sx;  // Holds number of generated bits
 
 SAM CUT (str, mode, clk, reset, msg, frame); 	// Once you have described SAM you need to uncomment this
                                                 // You may need to change that if you have arranged I/Os in a different way
@@ -49,6 +50,7 @@ initial                    			// At initialisation all signals are inactive.
     key_length = 8;
  #5 mode       = 1'b0;
     i          = 0;
+	sx         = 0;
     reset      = 1'b0;
 #4  reset      = 1'b1;
   end
@@ -83,6 +85,16 @@ initial
                                                 // bits has arrived in good order.
       counterones = 5'h0;
       counterzeros = 5'h0;
+	  
+	// Configuration state indicated.
+    # 11000  mode = 1'b0;  // Extra cycle required for handling the two unmodelled edges
+                                                // that is, the one before transmission of n and
+                                                // the one after the last bit of capsN
+    # 11100 i = 9;
+            sx = 1;	// After the end of configuration, we let some time pass before the
+                                                // first bit of the first message appears. Note that i is initialized to 9
+                                                // since you need the start of the (n+1) bit to be sure that a message of n
+                                                // bits has arrived in good ord
   end
 
 
@@ -126,13 +138,13 @@ always @(negedge clk)
 // Message starts hereafter.
 
       begin
-        if (i)                                      // We only provide for a sample message. You may want to change this
+        if ((i) && (!sx))                                       // We only provide for a sample message. You may want to change this
                                                     // if you feel the need for more. 
           begin 
             if ( (!counterones) && (!counterzeros) )// Previous bit complete
               begin
-                counterones  = 5 + 12;//$random%25;      // Generate the 1 duration between 5 and 29 cycles
-                counterzeros = 5 + 5;//$random%24;      // Generate the 0 duration between 5 and 28 cycles
+                counterones  = 5 + 5;//$random%25;      // Generate the 1 duration between 5 and 29 cycles
+                counterzeros = 5 + 12;//$random%24;      // Generate the 0 duration between 5 and 28 cycles
                                                     // Note that this provides only with CORRECT messages as far as their
                                                     // duration is concerned but does not exclude that a bit is equal
                                                     // times at 1 and at 0. To overcome this you may define 
@@ -145,7 +157,25 @@ always @(negedge clk)
                 i <= i-1;
               end
           end
-         else $stop();
+		  else if ((sx) && (i))
+		   begin 
+		    if ( (!counterones) && (!counterzeros) )// Previous bit complete
+              begin
+                counterones  = 5 + 15;//$random%25;      // Generate the 1 duration between 5 and 29 cycles
+                counterzeros = 5 + 7;//$random%24;      // Generate the 0 duration between 5 and 28 cycles
+                                                    // Note that this provides only with CORRECT messages as far as their
+                                                    // duration is concerned but does not exclude that a bit is equal
+                                                    // times at 1 and at 0. To overcome this you may define 
+                                                    // counterzeros as a random disposal of the counterones values.
+                                                    // You may want to make your own changes for testing your fault
+                                                    // handling capabilities as well.
+                if (counterones > counterzeros)     // Determine what bit will be created and store it.
+                  sent[i-2] <= 1'b1;    
+                else sent[i-2] <= 1'b0;
+                i <= i-1;
+              end
+          end
+         //else $stop();
       end
 
 
